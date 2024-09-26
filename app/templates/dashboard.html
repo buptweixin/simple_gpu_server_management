@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ title }} - GPU服务器管理系统</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/bootstrap.min.css') }}">
+    <style>
+        .server-free {
+            background-color: #e6ffe6; /* 浅绿色 */
+        }
+        .server-occupied {
+            background-color: #ffe6e6; /* 浅红色 */
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-light bg-light">
+        <div class="container">
+            <a class="navbar-brand" href="{{ url_for('dashboard') }}">GPU服务器管理系统</a>
+            <div class="navbar-nav ml-auto">
+                <a class="nav-item nav-link" href="{{ url_for('dashboard') }}">仪表板</a>
+                <a class="nav-item nav-link" href="{{ url_for('server_management') }}">服务器管理</a>
+                {% if current_user.is_admin %}
+                    <a class="nav-item nav-link" href="{{ url_for('user_management') }}">用户管理</a>
+                {% endif %}
+                <a class="nav-item nav-link" href="{{ url_for('logout') }}">登出</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <h1>欢迎，{{ current_user.username }}!</h1>
+        
+        <!-- 添加服务器统计信息 -->
+        <div class="card mb-4">
+            <div class="card-body">
+                <h5 class="card-title">服务器统计</h5>
+                <p><strong>总服务器数量:</strong> {{ total_servers }}</p>
+                <p><strong>未分配服务器数量:</strong> {{ free_servers }}</p>
+                <p><strong>已分配服务器数量:</strong> {{ occupied_servers }}</p>
+                {% if last_update_time %}
+                    <p><strong>最后更新时间:</strong> {{ last_update_time.strftime('%Y-%m-%d %H:%M:%S') }}</p>
+                    <p><strong>下次更新时间:</strong> {{ next_update_time.strftime('%Y-%m-%d %H:%M:%S') }}</p>
+                {% else %}
+                    <p><strong>最后更新时间:</strong> 尚未更新</p>
+                    <p><strong>下次更新时间:</strong> 即将更新</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <h2>服务器列表</h2>
+        <p class="text-muted">（未分配且 GPU 使用率低于 10% 的服务器会显示在前面）</p>
+        {% if servers %}
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>名称</th>
+                        <th>IP地址</th>
+                        <th>GPU数量</th>
+                        <th>平均GPU使用率</th>
+                        <th>状态</th>
+                        <th>占用人</th>
+                        <th>备注</th>
+                        <th>预计释放时间</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for server in servers %}
+                    <tr class="{{ 'server-occupied' if server.is_occupied else 'server-free' }}">
+                        <td><a href="{{ url_for('server_detail', server_id=server.id) }}">{{ server.name }}</a></td>
+                        <td>{{ server.ip }}</td>
+                        <td>{{ server.gpu_count }}</td>
+                        <td>
+                            {% if server.gpu_usage is not none %}
+                                {{ server.gpu_usage|round(2) }}%
+                            {% else %}
+                                N/A
+                            {% endif %}
+                        </td>
+                        <td>{{ '已分配' if server.is_occupied else '未分配' }}</td>
+                        <td>{{ server.occupied_by.username if server.occupied_by else 'N/A' }}</td>
+                        <td>{{ server.note or 'N/A' }}</td>
+                        <td>{{ server.release_time.strftime('%Y-%m-%d %H:%M') if server.release_time else 'N/A' }}</td>
+                        <td>
+                            {% if server.is_occupied and (current_user.is_admin or current_user == server.occupied_by) %}
+                                <a href="{{ url_for('release_server', server_id=server.id) }}" class="btn btn-warning btn-sm">释放</a>
+                                <button type="button" class="btn btn-info btn-sm" data-bs-toggle="modal" data-bs-target="#updateModal{{ server.id }}">
+                                    更新
+                                </button>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% else %}
+            <p>目前没有服务器信息。</p>
+        {% endif %}
+
+        <h2>已分配服务器</h2>
+        <form method="POST">
+            {{ form.hidden_tag() }}
+            <div class="mb-3">
+                {{ form.servers.label(class="form-label") }}
+                {{ form.servers(class="form-select") }}
+            </div>
+            <div class="mb-3">
+                {{ form.note.label(class="form-label") }}
+                {{ form.note(class="form-control") }}
+            </div>
+            <div class="mb-3">
+                {{ form.release_time.label(class="form-label") }}
+                {{ form.release_time(class="form-control", type="datetime-local") }}
+            </div>
+            {{ form.submit(class="btn btn-primary") }}
+        </form>
+    </div>
+
+    {% for server in servers %}
+        {% if server.is_occupied and (current_user.is_admin or current_user == server.occupied_by) %}
+            <div class="modal fade" id="updateModal{{ server.id }}" tabindex="-1" aria-labelledby="updateModalLabel{{ server.id }}" aria-hidden="true">
+                <div class="modal-dialog">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title" id="updateModalLabel{{ server.id }}">更新服务器信息</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body">
+                            <form action="{{ url_for('update_server', server_id=server.id) }}" method="POST">
+                                <div class="mb-3">
+                                    <label for="note{{ server.id }}" class="form-label">备注</label>
+                                    <textarea class="form-control" id="note{{ server.id }}" name="note">{{ server.note }}</textarea>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="release_time{{ server.id }}" class="form-label">预计释放时间</label>
+                                    <input type="datetime-local" class="form-control" id="release_time{{ server.id }}" name="release_time" value="{{ server.release_time.strftime('%Y-%m-%dT%H:%M') if server.release_time else '' }}">
+                                </div>
+                                <button type="submit" class="btn btn-primary">更新</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        {% endif %}
+    {% endfor %}
+
+    <script src="{{ url_for('static', filename='js/bootstrap.bundle.min.js') }}"></script>
+</body>
+</html>

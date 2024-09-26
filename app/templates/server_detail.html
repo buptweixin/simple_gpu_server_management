@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ title }} - GPU服务器管理系统</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/bootstrap.min.css') }}">
+    <script src="{{ url_for('static', filename='js/chart.js') }}"></script>
+    <!-- <script src="https://cdn.jsdelivr.net/npm/chart.js"></script> -->
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-light bg-light">
+        <div class="container">
+            <a class="navbar-brand" href="{{ url_for('dashboard') }}">GPU服务器管理系统</a>
+            <div class="navbar-nav ml-auto">
+                <a class="nav-item nav-link" href="{{ url_for('dashboard') }}">仪表板</a>
+                <a class="nav-item nav-link" href="{{ url_for('server_management') }}">服务器管理</a>
+                {% if current_user.is_admin %}
+                    <a class="nav-item nav-link" href="{{ url_for('user_management') }}">用户管理</a>
+                {% endif %}
+                <a class="nav-item nav-link" href="{{ url_for('logout') }}">登出</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <h1>服务器详情: {{ server.name }}</h1>
+        <div class="card mb-4">
+            <div class="card-body">
+                <h5 class="card-title">基本信息</h5>
+                <p><strong>IP地址:</strong> {{ server.ip }}</p>
+                <p><strong>GPU数量:</strong> {{ server.gpu_count }}</p>
+                <p><strong>平均GPU使用率:</strong> {{ server.gpu_usage|round(2) if server.gpu_usage is not none else 'N/A' }}%</p>
+                <p><strong>状态:</strong> {{ '已分配' if server.is_occupied else '未分配' }}</p>
+                {% if server.is_occupied %}
+                    <p><strong>占用人:</strong> {{ server.occupied_by.username }}</p>
+                    <p><strong>备注:</strong> {{ server.note or 'N/A' }}</p>
+                    <p><strong>预计释放时间:</strong> {{ server.release_time.strftime('%Y-%m-%d %H:%M') if server.release_time else 'N/A' }}</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <h2>GPU 详细信息</h2>
+        <table class="table table-striped">
+            <thead>
+                <tr>
+                    <th>GPU 索引</th>
+                    <th>显存使用率</th>
+                    <th>GPU 利用率</th>
+                    <th>进程名</th>
+                    <th>进程 ID</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for gpu in gpu_info %}
+                <tr>
+                    <td>{{ gpu.gpu_index }}</td>
+                    <td>{{ gpu.memory_usage|round(2) }}%</td>
+                    <td>{{ gpu.utilization|round(2) }}%</td>
+                    <td>{{ gpu.process_name or 'N/A' }}</td>
+                    <td>{{ gpu.process_id or 'N/A' }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <h2>GPU 使用率历史</h2>
+        <canvas id="gpuUsageChart"></canvas>
+
+        <a href="{{ url_for('dashboard') }}" class="btn btn-primary mt-3">返回仪表板</a>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/bootstrap.bundle.min.js') }}"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var ctx = document.getElementById('gpuUsageChart').getContext('2d');
+            var chart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: {{ timestamps|tojson|safe }},
+                    datasets: [{
+                        label: 'GPU 使用率',
+                        data: {{ usage_data|tojson|safe }},
+                        borderColor: 'rgb(75, 192, 192)',
+                        tension: 0.1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            max: 100
+                        }
+                    }
+                }
+            });
+        });
+    </script>
+</body>
+</html>

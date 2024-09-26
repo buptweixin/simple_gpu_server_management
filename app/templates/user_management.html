@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ title }} - GPU服务器管理系统</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/bootstrap.min.css') }}">
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-light bg-light">
+        <div class="container">
+            <a class="navbar-brand" href="{{ url_for('dashboard') }}">GPU服务器管理系统</a>
+            <div class="navbar-nav ml-auto">
+                <a class="nav-item nav-link" href="{{ url_for('dashboard') }}">仪表板</a>
+                <a class="nav-item nav-link" href="{{ url_for('server_management') }}">服务器管理</a>
+                {% if current_user.is_admin %}
+                    <a class="nav-item nav-link" href="{{ url_for('user_management') }}">用户管理</a>
+                {% endif %}
+                <a class="nav-item nav-link" href="{{ url_for('logout') }}">登出</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <h1>用户管理</h1>
+        <form method="POST" class="mb-4">
+            {{ form.hidden_tag() }}
+            <div class="row">
+                <div class="col-md-3 mb-3">
+                    {{ form.username.label(class="form-label") }}
+                    {{ form.username(class="form-control") }}
+                </div>
+                <div class="col-md-3 mb-3">
+                    {{ form.password.label(class="form-label") }}
+                    {{ form.password(class="form-control") }}
+                </div>
+                <div class="col-md-3 mb-3">
+                    <div class="form-check mt-4">
+                        {{ form.is_admin(class="form-check-input") }}
+                        {{ form.is_admin.label(class="form-check-label") }}
+                    </div>
+                </div>
+                <div class="col-md-3 mb-3 d-flex align-items-end">
+                    {{ form.submit(class="btn btn-primary") }}
+                </div>
+            </div>
+        </form>
+
+        <h2>用户列表</h2>
+        {% if users %}
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>用户名</th>
+                        <th>管理员</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for user in users %}
+                    <tr>
+                        <td>{{ user.username }}</td>
+                        <td>{{ '是' if user.is_admin else '否' }}</td>
+                        <td>
+                            {% if user != current_user %}
+                                <a href="{{ url_for('delete_user', user_id=user.id) }}" class="btn btn-danger btn-sm" onclick="return confirm('确定要删除这个用户吗？')">删除</a>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% else %}
+            <p>目前没有用户信息。</p>
+        {% endif %}
+    </div>
+
+    <script src="{{ url_for('static', filename='js/bootstrap.bundle.min.js') }}"></script>
+</body>
+</html>

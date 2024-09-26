@@ -1,0 +1,5 @@
+APScheduler==3.10.4
+Flask_Login==0.6.3
+Flask_Migrate==4.0.7
+pytz==2024.2
+SQLAlchemy==2.0.35
